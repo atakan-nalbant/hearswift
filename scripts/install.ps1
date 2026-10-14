@@ -32,14 +32,23 @@ if ($existing) {
     Stop-ScheduledTask -TaskName $taskName
 }
 Get-Process -Name HearSwift,AirPodsQuickMode -ErrorAction SilentlyContinue | ForEach-Object {
-    if ($_.SessionId -eq $sessionId -and ($_.Path -eq $exe -or $_.Path -in $legacyPaths)) { Stop-Process -Id $_.Id -Force }
+    if ($_.SessionId -eq $sessionId -and ($_.Path -eq $exe -or $_.Path -in $legacyPaths)) {
+        Stop-Process -Id $_.Id -Force
+        if (!$_.WaitForExit(5000)) { throw 'The existing app did not exit. Close it before updating.' }
+    }
 }
 New-Item -ItemType Directory -Force $installDir | Out-Null
 try {
     foreach ($file in $files) {
         $sourceFile = Join-Path $PSScriptRoot $file
         $targetFile = Join-Path $installDir $file
-        if ([IO.Path]::GetFullPath($sourceFile) -ne [IO.Path]::GetFullPath($targetFile)) { Copy-Item -LiteralPath $sourceFile -Destination $targetFile -Force }
+        if ([IO.Path]::GetFullPath($sourceFile) -ne [IO.Path]::GetFullPath($targetFile)) {
+            # Task/process termination can return before Windows releases the executable image.
+            for ($copyAttempt=0; $copyAttempt -lt 15; $copyAttempt++) {
+                try { Copy-Item -LiteralPath $sourceFile -Destination $targetFile -Force -ErrorAction Stop; break }
+                catch [IO.IOException] { if ($copyAttempt -eq 14) { throw }; Start-Sleep -Milliseconds 300 }
+            }
+        }
     }
     $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $action = New-ScheduledTaskAction -Execute $exe -WorkingDirectory $installDir

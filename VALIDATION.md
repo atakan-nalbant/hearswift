@@ -21,11 +21,12 @@ HearSwift public-name transition:
 - Verified HearSwift uninstall, reinstall and single-instance behavior.
 - With AirPods 3 connected, the installed HearSwift runtime received microphone buffers and released them successfully. F9/F11/F9/status/off passed, including immediate re-enabling after F11. Exactly one installed app process remained.
 - The HearSwift archive contains the 15 intended executable, script and documentation files; its SHA-256 matches and no local settings/logs are included.
+- Verified updating the installed app with all 15 package files. The installer waits for process exit and retries briefly while Windows releases an executable image lock.
+- The prototype and initial HearSwift branch both passed the GitHub-hosted Windows build. Final PR and release runs are available in the repository's Actions history.
 
 Not yet verified:
 
 - Objective latency measurements, a new subjective listening comparison, and physical unplug/reconnect during active capture.
 - Sign out/sign in or reboot. Logon trigger configuration was inspected; no user session was interrupted.
 - Other headset models, other Windows versions, ARM, restrictive enterprise policies, or a separate clean computer.
-- The HearSwift-branded GitHub-hosted CI/release run is checked as part of PR preparation. The initial prototype's GitHub Windows build passed.
 - Code signing, which is not configured.
