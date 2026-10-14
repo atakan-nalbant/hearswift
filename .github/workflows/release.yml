@@ -1,4 +1,4 @@
-name: Draft release
+name: HearSwift draft release
 on:
   push:
     tags: ['v*']
@@ -29,6 +29,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          $assets = @(Get-ChildItem dist -File | Where-Object { $_.Name -match '\.(zip|sha256)$' } | ForEach-Object FullName)
-          gh release create $env:RELEASE_TAG @assets --verify-tag --draft --title "AirPods Quick Mode $env:RELEASE_TAG" --notes-file RELEASE_NOTES.md
+          $version = $env:RELEASE_TAG.Substring(1)
+          $zip = "dist/HearSwift-$version-windows.zip"
+          $assets = @($zip, "$zip.sha256")
+          gh release create $env:RELEASE_TAG @assets --verify-tag --draft --prerelease --title "HearSwift $env:RELEASE_TAG" --notes-file RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }

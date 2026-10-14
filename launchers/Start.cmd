@@ -1,2 +1,2 @@
 @echo off
-start "" "%~dp0AirPodsQuickMode.exe"
+start "" "%~dp0HearSwift.exe"
