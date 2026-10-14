@@ -1,69 +1,115 @@
-# AirPods Quick Mode
+# HearSwift
 
-[Türkçe kullanım kılavuzu](README.tr.md)
+**A keyboard-controlled Bluetooth call mode for more responsive screen reader audio on Windows.**
 
-A small Windows tray application for screen reader users who prefer the responsiveness of their Bluetooth headset's call profile. It opens the selected microphone and discards incoming audio in memory. Windows can then switch from A2DP to HFP, as it does during calls.
+[Download releases](https://github.com/atakan-nalbant/hearswift/releases) · [Türkçe](README.tr.md) · [Contributing](CONTRIBUTING.md) · [Test results](VALIDATION.md)
 
-This is an experimental utility, not a guarantee of zero latency. Quality usually drops to mono call audio; battery use can increase. Tested with AirPods 3 on Windows 11 25H2. Other devices and Windows versions need community testing.
+## Why HearSwift exists
 
-## Requirements
+HearSwift began with an accessibility problem: AirPods sounded clear on a Windows computer, but screen reader speech arrived late after **every keypress**. Navigating quickly meant repeatedly waiting for audio feedback.
 
-- Windows 10/11, .NET Framework 4.8, and a paired Bluetooth headset with an enabled microphone.
-- Windows microphone privacy settings must allow desktop apps to access the microphone.
-- Windows on ARM has not been tested. Build/package verification currently targets Windows x64; the executable is AnyCPU.
+Then a meeting started. Sound quality became a little worse, but the screen reader suddenly felt much more responsive. The useful part was the headset's call mode. Joining a meeting just to get that behavior should not be necessary.
 
-## Install
+HearSwift turns that observation into an explicit, keyboard-controlled mode. Press a shortcut when responsiveness matters; turn it off when you want normal listening quality again. It started with AirPods 3, but the underlying Windows Bluetooth behavior also applies to other headsets that support the Hands-Free Profile (HFP).
 
-1. Download the Windows ZIP from this repository's Releases page and extract it completely.
-2. Run `Setup.cmd` as your normal Windows user. Administrator privileges are not required.
-3. Connect your AirPods and use the shortcuts below. Mode starts **off**.
+## What it does
 
-The installer copies the app to `%LOCALAPPDATA%\AirPodsQuickMode\app`, adds Start menu entries and an Installed Apps entry, and creates an `AirPodsQuickMode-<user SID>` scheduled task unique to the current Windows user. The task starts the app at sign-in and relaunches it within a minute if it exits. It runs on battery, only while you are signed in. Task Scheduler must be available; organizational policies may block task registration.
+Windows commonly uses two profiles for Bluetooth Classic audio:
 
-For portable use, run `Start.cmd` instead. Portable mode adds no startup task; settings and diagnostic logs still live in `%LOCALAPPDATA%\AirPodsQuickMode\data`.
+| Profile | Typical use | Tradeoff |
+| --- | --- | --- |
+| A2DP | Higher-quality stereo listening | The feedback delay can be noticeable during interactive screen reader use. |
+| HFP | Calls: microphone and playback together | Lower-fidelity, generally mono audio; it may feel more responsive on a given setup. |
 
-Unsigned builds may trigger Windows reputation warnings. These releases are not code-signed. Verify the downloaded ZIP with the adjacent SHA-256 file: `Get-FileHash .\AirPodsQuickMode-0.1.0-windows.zip -Algorithm SHA256`.
+Opening the headset microphone asks Windows to use its call profile. HearSwift keeps that microphone stream open while quick mode is on and discards the incoming samples in memory. It does **not** record, transmit or play back microphone audio. Turning the mode off releases the microphone.
 
-## Shortcuts
+This is an experimental workaround, not a new Bluetooth driver or a universal latency fix. HearSwift does not measure latency or verify the active Bluetooth profile. Improvement depends on your headset, Bluetooth adapter and drivers. It does not fix pairing failures, interference, or every source of audio delay. The technical basis is documented in [Microsoft's Bluetooth Classic Audio guide](https://learn.microsoft.com/en-us/windows-hardware/drivers/bluetooth/bluetooth-classic-audio).
 
-| Default shortcut | Action |
+## Quick start
+
+1. Download the Windows ZIP from [Releases](https://github.com/atakan-nalbant/hearswift/releases) and extract **all** files.
+2. Run **Setup.cmd** as your normal Windows user. Administrator rights are not required.
+3. Connect your headset and set your screen reader's audio output to that headset.
+4. Press **Ctrl+Alt+F9** to turn quick mode on. Compare the response while navigating with your keyboard.
+5. Press **Ctrl+Alt+F11** to turn it off. HearSwift stays in the background and keeps listening for shortcuts.
+
+For a headset other than AirPods, first open **Settings.cmd** and select its Bluetooth microphone. Automatic selection currently looks for exactly one microphone with `AirPods` in its name; other headsets require explicit selection.
+
+For portable use, run **Start.cmd** instead of Setup.cmd. Portable mode does not add automatic startup.
+
+### Default shortcuts
+
+| Shortcut | Action |
 | --- | --- |
 | Ctrl+Alt+F9 | Toggle quick mode |
-| Ctrl+Alt+F10 | Speak current status |
-| Ctrl+Alt+F11 | Turn mode off, keeping shortcuts active |
+| Ctrl+Alt+F10 | Speak the current status |
+| Ctrl+Alt+F11 | Turn quick mode off; keep the shortcut listener running |
 
-Open `Settings.cmd`, the Start menu Settings entry, or Settings from the tray icon. All controls are keyboard accessible and labeled for screen readers. Choose a microphone, distinct F1–F24 keys, modifier combination, Turkish/English UI, and spoken feedback. Saving settings turns mode off. Shortcuts in use by other programs are rejected; choose another combination. Settings changes are sent to an existing app instance rather than starting a second copy.
+Open **Settings.cmd**, the Start menu Settings entry, or Settings in the tray menu to change the microphone, shortcut keys, modifier combination, language, or spoken feedback. Controls have screen reader labels and support keyboard navigation. Full screen reader testing is still welcome.
 
-Automatic selection requires exactly one input device whose name contains `AirPods`. If it fails, choose the headset microphone explicitly. Selecting a laptop microphone will not switch the AirPods profile. Connect/reconnect the headset before opening Settings to refresh the device list. Windows' legacy audio API may truncate device names; identically named devices cannot be distinguished by this version.
+Shortcuts must use distinct F1–F24 keys with Ctrl+Alt, Ctrl+Shift, Alt+Shift, or Ctrl+Alt+Shift. A combination already registered by another application is rejected. Saving settings turns quick mode off. Settings.cmd opens the running instance's settings instead of starting a second listener.
 
-The output device is not changed by this app. Configure your screen reader to play through your AirPods. If another app keeps the microphone open, turning quick mode off may leave the call profile active. On disconnect or capture failure, mode turns off; reconnect and toggle it on again. HFP is requested through microphone use; the application does not measure the actual Bluetooth profile or end-to-end latency.
+## Requirements and compatibility
 
-## Privacy and battery
+- Windows 10 or Windows 11 with .NET Framework 4.8.
+- A paired Bluetooth headset with an enabled, Windows-accessible microphone; the intended mechanism is Bluetooth Classic HFP.
+- Windows microphone privacy settings must allow desktop applications to access the microphone.
+- Task Scheduler must be available for the installed startup/restart feature. Organization policies may restrict it.
 
-Microphone samples stay in short-lived native memory buffers and are discarded. No audio recording, audio playback, network requests, telemetry, or administrator access is used. Windows displays its microphone-use indicator while mode is active. Logs contain timestamps, device names and errors; review them before sharing. Logs are capped at approximately 1 MB. Keeping the microphone open can increase battery consumption. Startup does not enable quick mode automatically.
+**Initial hardware testing:** AirPods 3 on Windows 11 25H2, build 26200.9457. This is not a compatibility certification for every AirPods model, Windows version, or Bluetooth headset. Other HFP headsets are candidates for testing through manual microphone selection. Bluetooth LE Audio can behave differently. Windows on ARM has not been tested; the executable is AnyCPU and local verification used x64 Windows.
 
-## Uninstall and update
+## Tradeoffs and behavior
 
-Run `Uninstall.cmd` in the installed app folder, or uninstall **AirPods Quick Mode** through Windows Installed Apps. This removes the scheduled task, menu entries and app files. Settings/logs are preserved. To remove those too, run the installed `uninstall.ps1 -RemoveSettings` before uninstalling. The uninstaller refuses to remove a task pointing to a different installation.
+- **Quality:** call mode can reduce fidelity and switch playback to mono.
+- **Battery:** keeping the microphone open can use more headset battery. No measured battery-life claim is made for HearSwift.
+- **Microphone indicator:** Windows shows microphone use while quick mode is active.
+- **Startup:** the application starts with quick mode **off**. It does not enable microphone use automatically.
+- **Output routing:** HearSwift does not change your audio output device. Select the headset in Windows or your screen reader.
+- **Other applications:** if a meeting or another application still holds the headset microphone open, turning HearSwift off may not restore the listening profile until that application releases it.
+- **Disconnects:** when capture fails or audio stops arriving, quick mode turns off. Reconnect the headset and enable it again.
+- **Device names:** Windows' legacy audio API can truncate microphone names. Identically named devices cannot be distinguished in this version.
 
-To update, extract the new ZIP and run `Setup.cmd` again. Settings are retained. Exit any manually launched portable copy before installing. The installer updates the current user's task and migrates the original prototype's task when owned by the same user. Only one app copy runs per session.
+## Installation, updates and removal
+
+Setup installs to `%LOCALAPPDATA%\HearSwift\app`, creates Start menu entries and a Windows Installed Apps entry, and adds a per-user `HearSwift-<user SID>` scheduled task. The task starts HearSwift at sign-in and relaunches it within approximately one minute if it exits. It runs on battery and only while you are signed in. Choosing Exit in the tray menu therefore does not permanently stop an installed copy; use the off shortcut for normal daily use.
+
+To update, extract the next release ZIP and run Setup.cmd again. Settings are retained. Exit manually started portable copies before installation. An older AirPods Quick Mode installation is migrated: its startup task is replaced and its settings are copied on first launch if HearSwift settings do not exist. The old files remain available for rollback.
+
+To remove HearSwift, use Windows **Installed Apps** or run **Uninstall.cmd** from the installed folder. The application files, startup task, shortcuts and Installed Apps entry are removed. Settings and diagnostic logs remain. To delete those too, run the installed `uninstall.ps1 -RemoveSettings` before uninstalling. The uninstaller refuses to remove a task that points to another installation.
+
+## Privacy
+
+HearSwift has no network requests, telemetry, account requirement or cloud service. Microphone samples are kept only in short-lived native memory buffers and discarded. No microphone audio is written to disk, sent elsewhere, or played through your speakers.
+
+Settings and diagnostic logs are stored in `%LOCALAPPDATA%\HearSwift\data`, including for portable use. Logs contain timestamps, device names and errors, not audio. Review them before sharing. The current log rotates at approximately 1 MB.
 
 ## Build and test
 
-No NuGet packages or external SDK downloads are needed on a Windows machine with .NET Framework 4.8:
+On Windows with .NET Framework 4.8, no NuGet packages or external SDK downloads are required:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Version 0.1.0
 ```
 
-Output: `dist/AirPodsQuickMode-0.1.0-windows.zip` and its `.sha256` file. The build runs a hardware-independent settings self-test. The scripts compile using the Windows .NET Framework C# compiler and System.Speech assembly. `--self-test`, `--devices`, and `--test` exit with a nonzero code on failure and write to the diagnostic log. `--test` actually opens the selected microphone for several seconds; do not run it alongside an active capture session.
+This compiles the app, runs a hardware-independent settings self-test, and produces:
 
-Before a public release, perform [the manual checks](TESTING.md) on real devices. CI cannot validate Bluetooth audio or human-perceived latency.
+- `dist/HearSwift-0.1.0-windows.zip`
+- `dist/HearSwift-0.1.0-windows.zip.sha256`
 
-## GitHub Releases
+Builds are currently **unsigned**. Windows may display reputation warnings. You can compare the downloaded archive's SHA-256 with its adjacent checksum file:
 
-After adding your remote and pushing the repository, create a version tag such as `v0.1.0`. The release workflow compiles a matching version and creates a **draft** release with the ZIP, SHA-256 checksum and release notes. Review the assets and device tests, then publish the draft. Regular pushes and pull requests build packages as CI artifacts. Update `CHANGELOG.md`, `RELEASE_NOTES.md`, and the default version in `scripts/build.ps1` for subsequent releases. A signing certificate can be added later; signing is not currently configured.
+```powershell
+Get-FileHash .\HearSwift-0.1.0-windows.zip -Algorithm SHA256
+```
 
-Technical basis: [Microsoft Bluetooth Classic Audio](https://learn.microsoft.com/en-us/windows-hardware/drivers/bluetooth/bluetooth-classic-audio). This project is independent of Apple and Microsoft.
+Diagnostic arguments: `--self-test`, `--devices`, `--test`, and `--settings`. The first three return a nonzero exit code on failure and write diagnostic information to the log; --devices also writes devices.txt. **--test opens the selected microphone for several seconds**, so do not run it alongside an active capture session.
 
-License: [MIT](LICENSE).
+See [TESTING.md](TESTING.md) for the release checklist and [VALIDATION.md](VALIDATION.md) for what was actually tested. CI checks builds and packaging; it cannot establish physical Bluetooth behavior or perceived screen reader latency.
+
+## Releases and contributions
+
+Branch pushes and pull requests build Windows artifacts with GitHub Actions. A `vMAJOR.MINOR.PATCH` tag builds a matching archive and checksum and prepares a **draft prerelease** with release notes. The first release remains experimental. A draft can be tested before publishing; no code-signing certificate is configured.
+
+Contributions are welcome, especially device compatibility reports, accessibility feedback and reproducible bugs. Please include your Windows build, headset model, screen reader/version, and whether the issue affects every keypress or only audio starting after silence. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+[MIT licensed](LICENSE). HearSwift is an independent community project, unaffiliated with Apple or Microsoft.

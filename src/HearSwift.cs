@@ -33,6 +33,10 @@ using System.Globalization;
         return ((Modifiers & 2) != 0 ? "Ctrl+" : "") + ((Modifiers & 1) != 0 ? "Alt+" : "") + ((Modifiers & 4) != 0 ? "Shift+" : "") + (Keys)key;
     }
     public static Settings Load() {
+        if (!File.Exists(Program.ConfigPath)) {
+            string legacy = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AirPodsQuickMode", "data", "settings.json");
+            if (File.Exists(legacy)) File.Copy(legacy, Program.ConfigPath, false);
+        }
         if (!File.Exists(Program.ConfigPath)) return new Settings();
         using (Stream s = File.OpenRead(Program.ConfigPath)) {
             Settings result = (Settings)new DataContractJsonSerializer(typeof(Settings)).ReadObject(s);
@@ -49,7 +53,7 @@ using System.Globalization;
 }
 
 static class Program {
-    public static readonly string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AirPodsQuickMode", "data");
+    public static readonly string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HearSwift", "data");
     public static readonly string LogPath = Path.Combine(DataPath, "status.log");
     public static readonly string ConfigPath = Path.Combine(DataPath, "settings.json");
     public static Settings Config;
@@ -78,6 +82,7 @@ static class Program {
                 }
                 Log("TEST PASS: capture released"); return 0;
             }
+            // Share the instance identity with the prototype to avoid two microphone holders.
             using (Mutex m = new Mutex(false, "Local\\AirPodsQuickMode")) {
                 bool owned;
                 try { owned = m.WaitOne(0); } catch (AbandonedMutexException) { owned = true; }
@@ -88,7 +93,7 @@ static class Program {
                 try { Application.EnableVisualStyles(); Application.Run(new ModeContext(args.Length > 0 && args[0] == "--settings")); } finally { m.ReleaseMutex(); }
             }
             return 0;
-        } catch (Exception e) { Log("ERROR " + e); if(args.Length == 0 || args[0] == "--settings") MessageBox.Show(e.Message + "\n\n" + LogPath, "AirPods Quick Mode", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
+        } catch (Exception e) { Log("ERROR " + e); if(args.Length == 0 || args[0] == "--settings") MessageBox.Show(e.Message + "\n\n" + LogPath, "HearSwift", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
     }
     static void SelfTest() {
         Settings c = new Settings(); c.Validate();
@@ -152,10 +157,10 @@ sealed class Capture : IDisposable {
                     chosen=i;
                 }
             }
-            if (chosen == uint.MaxValue) throw new Exception("Microphone not found. Connect AirPods, allow desktop microphone access in Windows, and check Settings.");
+            if (chosen == uint.MaxValue) throw new Exception("Microphone not found. Connect your Bluetooth headset, allow desktop microphone access in Windows, and choose its microphone in Settings.");
             Program.Log("Selected microphone: " + names[chosen]);
             Format f = new Format {tag=1, channels=1, rate=16000, bytesPerSec=32000, align=2, bits=16};
-            Check(waveInOpen(out handle, chosen, ref f, IntPtr.Zero, IntPtr.Zero, 0), "Open AirPods microphone");
+            Check(waveInOpen(out handle, chosen, ref f, IntPtr.Zero, IntPtr.Zero, 0), "Open headset microphone");
             for (int i=0; i<4; i++) {
                 data[i]=Marshal.AllocHGlobal(3200); headers[i]=Marshal.AllocHGlobal((int)size);
                 Header hdr = new Header {data=data[i], length=3200};
@@ -165,7 +170,7 @@ sealed class Capture : IDisposable {
             }
             Check(waveInStart(handle), "Start microphone");
             lastData = DateTime.UtcNow;
-            Program.Log("ON: AirPods capture active; audio discarded, never saved or transmitted");
+            Program.Log("ON: headset capture active; audio discarded, never saved or transmitted");
         } catch { Dispose(); throw; }
     }
     public void Pump() {
@@ -180,7 +185,7 @@ sealed class Capture : IDisposable {
             Check(waveInReset(handle), "Reset microphone");
             for(int i=0;i<4;i++) if(prepared[i]) { Check(waveInUnprepareHeader(handle,headers[i],size),"Release buffer"); prepared[i]=false; }
             Check(waveInClose(handle), "Close microphone"); handle=IntPtr.Zero;
-            Program.Log("OFF: AirPods microphone released");
+            Program.Log("OFF: headset microphone released");
         }
         for(int i=0;i<4;i++) {
             if(headers[i]!=IntPtr.Zero) { Marshal.FreeHGlobal(headers[i]); headers[i]=IntPtr.Zero; }
@@ -213,7 +218,7 @@ sealed class ModeContext : ApplicationContext {
     public ModeContext(bool openSettings) {
         try { voice=new SpeechSynthesizer(); } catch { }
         settingsRequest = new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\AirPodsQuickMode.Settings");
-        tray=new NotifyIcon {Icon=System.Drawing.SystemIcons.Application, Text="AirPods Quick Mode: OFF", Visible=true};
+        tray=new NotifyIcon {Icon=System.Drawing.SystemIcons.Application, Text="HearSwift: OFF", Visible=true};
         tray.DoubleClick+=delegate { ShowSettings(); };
         RebuildMenu();
         timer=new System.Windows.Forms.Timer {Interval=250};
@@ -221,9 +226,9 @@ sealed class ModeContext : ApplicationContext {
             if(settingsRequest.WaitOne(0)) ShowSettings();
             if(capture!=null) try { capture.Pump(); } catch(Exception e) { Stop(); Program.Log("ERROR "+e); Notify(Program.T("Mikrofon bağlantısı kesildi. Hızlı mod kapatıldı.","Microphone disconnected. Quick mode is off.")); }
         }; timer.Start();
-        try { BindKeys(); } catch(Exception e) { Program.Log("ERROR "+e); MessageBox.Show(e.Message,"AirPods Quick Mode"); openSettings=true; }
+        try { BindKeys(); } catch(Exception e) { Program.Log("ERROR "+e); MessageBox.Show(e.Message,"HearSwift"); openSettings=true; }
         Program.Log("READY: mode initially OFF; version 0.1.0");
-        Say(Program.T("AirPods hızlı mod hazır. Açmak için ","AirPods Quick Mode ready. To enable, press ") + Program.Config.Shortcut(Program.Config.ToggleKey));
+        Say(Program.T("HearSwift hazır. Açmak için ","HearSwift ready. To enable, press ") + Program.Config.Shortcut(Program.Config.ToggleKey));
         if(openSettings) settingsRequest.Set();
     }
     void BindKeys() { keys=new Hotkeys(Program.Config); keys.Pressed+=OnKey; }
@@ -254,21 +259,21 @@ sealed class ModeContext : ApplicationContext {
                     if(keys!=null) { keys.Dispose(); keys=null; }
                     Program.Config=previous;
                     try { BindKeys(); } catch(Exception restore) { Program.Log("ERROR restoring shortcuts: "+restore); }
-                    MessageBox.Show(e.Message,"AirPods Quick Mode",MessageBoxButtons.OK,MessageBoxIcon.Error);
+                    MessageBox.Show(e.Message,"HearSwift",MessageBoxButtons.OK,MessageBoxIcon.Error);
                 }
             }
         } finally { showingSettings=false; }
     }
     void Say(string s) { if(voice!=null && Program.Config.SpokenFeedback) try { voice.SpeakAsyncCancelAll(); voice.SpeakAsync(s); } catch { } }
-    void Notify(string s) { Say(s); tray.ShowBalloonTip(5000,"AirPods Quick Mode",s,ToolTipIcon.Info); }
+    void Notify(string s) { Say(s); tray.ShowBalloonTip(5000,"HearSwift",s,ToolTipIcon.Info); }
     void OnKey(int id) { if(id==1) Toggle(); else if(id==2) Status(); else if(id==3) DisableMode(); }
     void DisableMode() { Stop(); Program.Log("OFF requested; hotkeys remain active"); Say(Program.T("Hızlı mod kapalı.","Quick mode off.")); }
-    void Stop() { if(capture!=null) { capture.Dispose(); capture=null; } if(timer!=null) timer.Interval=250; tray.Text="AirPods Quick Mode: OFF"; }
+    void Stop() { if(capture!=null) { capture.Dispose(); capture=null; } if(timer!=null) timer.Interval=250; tray.Text="HearSwift: OFF"; }
     void Toggle() {
         try {
             if(capture!=null) { Stop(); Say(Program.T("Hızlı mod kapalı.","Quick mode off.")); }
-            else { Capture c=new Capture(); c.Open(Program.Config.Microphone); capture=c; timer.Interval=50; tray.Text="AirPods Quick Mode: ON"; Say(Program.T("Hızlı mod açık.","Quick mode on.")); }
-        } catch(Exception e) { Program.Log("ERROR "+e); Notify(Program.T("Hızlı mod açılamadı. AirPods bağlantısını ve Ayarlar'ı kontrol edin.","Could not enable quick mode. Check the AirPods connection and Settings.")); }
+            else { Capture c=new Capture(); c.Open(Program.Config.Microphone); capture=c; timer.Interval=50; tray.Text="HearSwift: ON"; Say(Program.T("Hızlı mod açık.","Quick mode on.")); }
+        } catch(Exception e) { Program.Log("ERROR "+e); Notify(Program.T("Hızlı mod açılamadı. Kulaklık bağlantısını ve Ayarlar'ı kontrol edin.","Could not enable quick mode. Check the headset connection and Settings.")); }
     }
     void Status() { Say(capture!=null ? Program.T("Hızlı mod açık.","Quick mode on.") : Program.T("Hızlı mod kapalı.","Quick mode off.")); Program.Log(capture!=null ? "STATUS ON" : "STATUS OFF"); }
     protected override void ExitThreadCore() {
@@ -286,7 +291,7 @@ sealed class SettingsDialog : Form {
         box.Items.AddRange(values); return box;
     }
     public SettingsDialog(Settings c) {
-        Text=Program.T("AirPods Quick Mode — Ayarlar","AirPods Quick Mode — Settings");
+        Text=Program.T("HearSwift — Ayarlar","HearSwift — Settings");
         StartPosition=FormStartPosition.CenterScreen; MinimumSize=new System.Drawing.Size(620,520);
         Size=new System.Drawing.Size(700,560); AutoScaleMode=AutoScaleMode.Font;
         TableLayoutPanel layout = new TableLayoutPanel {Dock=DockStyle.Fill, Padding=new Padding(16), ColumnCount=2, AutoScroll=true};

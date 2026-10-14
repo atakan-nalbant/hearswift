@@ -1,6 +1,6 @@
 # Validation — 2026-10-15
 
-Environment: Windows 11 Home Single Language 25H2, build 26200.9457, .NET Framework compiler. AirPods 3 was available during the initial capture test and disconnected during the final installed-package test.
+Environment: Windows 11 Home Single Language 25H2, build 26200.9457, .NET Framework compiler. AirPods 3 was available during the initial probe, disconnected during some installation tests, and reconnected for HearSwift's installed-runtime test.
 
 Verified locally:
 
@@ -14,12 +14,18 @@ Verified locally:
 - Forced termination followed by automatic scheduled recovery in 55 seconds.
 - Installed app while AirPods was disconnected: F9 reports missing microphone; F11 keeps listener active; immediate F9 works again; F10 reports OFF; exactly one app process remains. Fast mode stays off.
 
-Execution environment note: automation-created LocalAppData files were initially visible only in the automation process context, so direct scheduled launch returned file-not-found. Installation was rerun through a temporary scheduled installer in the real interactive user context; scheduled launch and lifecycle tests then passed. The temporary test task was removed. No workaround or machine-specific path is embedded in the product.
+HearSwift public-name transition:
+
+- Rebuilt HearSwift.exe under Windows PowerShell 5.1; the settings self-test passed.
+- Installed through the real interactive user session. Migrated prototype settings, removed the old startup task and started the new HearSwift task.
+- Verified HearSwift uninstall, reinstall and single-instance behavior.
+- With AirPods 3 connected, the installed HearSwift runtime received microphone buffers and released them successfully. F9/F11/F9/status/off passed, including immediate re-enabling after F11. Exactly one installed app process remained.
+- The HearSwift archive contains the 15 intended executable, script and documentation files; its SHA-256 matches and no local settings/logs are included.
 
 Not yet verified:
 
-- Final installed version with connected AirPods, including perceived latency comparison and physical unplug/reconnect during active capture.
+- Objective latency measurements, a new subjective listening comparison, and physical unplug/reconnect during active capture.
 - Sign out/sign in or reboot. Logon trigger configuration was inspected; no user session was interrupted.
 - Other headset models, other Windows versions, ARM, restrictive enterprise policies, or a separate clean computer.
-- GitHub-hosted CI/release execution, which requires the remote repository to be provided.
+- The HearSwift-branded GitHub-hosted CI/release run is checked as part of PR preparation. The initial prototype's GitHub Windows build passed.
 - Code signing, which is not configured.
